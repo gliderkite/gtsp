@@ -1,0 +1,4 @@
+*.tsp
+*.tour
+Makefile
+*.java
