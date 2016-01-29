@@ -2,3 +2,5 @@
 *.tour
 Makefile
 *.java
+.DS_Store
+gtsp

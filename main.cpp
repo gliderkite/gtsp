@@ -1,15 +1,6 @@
 #include "GTSP.hpp"
 
 
-#include "Particle.h"
-using namespace pso;
-
-#include "TSP.hpp"
-using namespace tsp;
-
-#include "Evect.hpp"
-
-
 #include <iostream>
 #include <vector>
 #include <random>
@@ -20,56 +11,65 @@ using namespace tsp;
 #include <sstream>
 #include <fstream>
 #include <limits>
+#include <chrono>
 using namespace std;
 using namespace chrono;
 
 
+static long long timeout = 0;
+static long long elapsed;
+static decltype(system_clock::now()) start;
 
 
-
-
-
-
-int main()
+static bool stop()
 {
-    const string dir = "/Users/mconte/Desktop/SI/si/si/";
-    
-    
-    GTSP<double> gtsp(dir + "berlin52.tsp");
-    gtsp.solve();
-    
-    
-    /*
-    
-    const auto best = tsp::read_tour(dir + "berlin52.opt.tour");
-    
-    cout << tsp::get_fitness(best, distances) << endl;
-    
-    const auto seed = (unsigned)system_clock::now().time_since_epoch().count();
-    auto gen = default_random_engine(seed);
-    
-    vector<Particle> particles;
-    particles.reserve(100);
-    
-    int idx = 0;
-    double min = numeric_limits<double>::max();
-    
-    for (int i = 0; i < 100; i++)
+    elapsed = duration_cast<seconds>(system_clock::now() - start).count();
+    return elapsed >= timeout;
+}
+
+
+int main(int argc, char* argv[])
+{
+    if (argc < 3)
     {
-        particles.emplace_back(Particle(52, gen));
-        auto fit = particles.back().cost(distances);
-        
-        if (fit < min)
-        {
-            min = fit;
-            idx = i;
-        }
+        cerr << "gtsp <filename> <timeout> [<best known>]" << endl;
+        return 1;
     }
     
-    cout << particles[idx].cost(distances) << endl;
-    //const auto diff = swaps(best, particles[idx].tour);
-    */
-
+    try
+    {
+        timeout = stoi(argv[2]);
+        const auto best_known = (argc == 4 ? stoi(argv[3]) : 0);
+        
+        GTSP<int> gtsp(argv[1]);
+        
+        start = system_clock::now();
+        const auto best = gtsp.solve(stop, best_known);
+        
+        cout << "Best: " << best.cost;
+        
+        if (best_known < best.cost && best_known != 0)
+            cout << " " << (double)best_known / best.cost << "%";
+        
+        cout << endl;
+        cout << "Elapsed: " << elapsed << " [s]" << endl << endl;
+        
+        cout << "Best tour:" << endl << "{";
+        for (size_t i = 0; i < best.tour.size(); i++)
+        {
+            cout << best.tour[i];
+            
+            if (i != best.tour.size() - 1)
+                cout << ", ";
+        }
+        cout << "}" << endl;
+    }
+    catch (exception& e)
+    {
+        cerr << "Exception: " << e.what() << endl;
+        return 1;
+    }
+    
 	return 0;
 }
 

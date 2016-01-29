@@ -12,6 +12,7 @@
 #include <cmath>
 #include <random>
 #include <chrono>
+#include <stdexcept>
 using namespace std;
 using namespace chrono;
 
@@ -23,43 +24,41 @@ namespace tsp
     {
         
         /* Reads the TSP file and returns a list of node (2D) coordinates. */
-        template<class T = double>
-        static vector<pair<T, T>> parse_tsplib(const string& filename)
+        static vector<pair<double, double>> parse_tsplib(const string& filename)
         {
-            vector<pair<T, T>> coordinates;
+            vector<pair<double, double>> coordinates;
             ifstream istream(filename);
             
-            if (istream.is_open())
+            if (!istream.is_open())
+                throw invalid_argument(filename);
+            
+            // read file
+            stringstream ss;
+            ss << istream.rdbuf();
+            
+            string str;
+            size_t dim = 0;
+            
+            // look for the start of the data section
+            while (getline(ss, str) && str != "NODE_COORD_SECTION")
             {
-                // read file
-                stringstream ss;
-                ss << istream.rdbuf();
+                const auto tokens = split(str, ':');
                 
-                string str;
-                size_t dim = 0;
-                
-                // look for the start of the data section
-                while (getline(ss, str) && str != "NODE_COORD_SECTION")
-                {
-                    const auto tokens = split(str, ':');
-                    
-                    // store the number of nodes
-                    if (tokens.size() == 2 && !tokens.front().compare(0, 9, "DIMENSION"))
-                        dim = stoul(tokens.back());
-                }
-                
-                coordinates.resize(dim);
-                
-                for (decltype(dim) i = 0; i < dim; i++)
-                {
-                    size_t idx;
-                    // skip the index
-                    ss >> idx;
-                    // read coordinates
-                    ss >> coordinates[i].first;
-                    ss >> coordinates[i].second;
-                }
-                
+                // store the number of nodes
+                if (tokens.size() == 2 && !tokens.front().compare(0, 9, "DIMENSION"))
+                    dim = stoul(tokens.back());
+            }
+            
+            coordinates.resize(dim);
+            
+            for (decltype(dim) i = 0; i < dim; i++)
+            {
+                size_t idx;
+                // skip the index
+                ss >> idx;
+                // read coordinates
+                ss >> coordinates[i].first;
+                ss >> coordinates[i].second;
             }
             
             return coordinates;
@@ -67,11 +66,11 @@ namespace tsp
         
         
         /* Gets the matrix of distances between nodes. */
-        template<class T = double>
-        static vector<vector<double>> distances(const vector<pair<T, T>>& coordinates)
+        template<class T>
+        static vector<vector<T>> distances(const vector<pair<double, double>>& coordinates)
         {
             const auto len = coordinates.size();
-            vector<vector<double>> matrix(len);
+            vector<vector<T>> matrix(len);
             
             for (auto& v : matrix)
                 v.resize(len);
@@ -79,7 +78,7 @@ namespace tsp
             for (size_t i = 0; i < len; i++)
             {
                 for (size_t j = i + 1; j < len; j++)
-                    matrix[i][j] = matrix[j][i] = norm(coordinates[i], coordinates[j]);
+                    matrix[i][j] = matrix[j][i] = (T)norm(coordinates[i], coordinates[j]);
             }
             
             return matrix;
@@ -93,14 +92,15 @@ namespace tsp
             const auto xdiff = p1.first - p2.first;
             const auto ydiff = p1.second - p2.second;
             
-            return sqrt(xdiff * xdiff + ydiff * ydiff);
+            return (T)sqrt(xdiff * xdiff + ydiff * ydiff);
         }
         
         
         /* http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/STSP.html */
-        static double cost(const vector<size_t>& tour, const vector<vector<double>>& distances)
+        template<class T>
+        static double cost(const vector<size_t>& tour, const vector<vector<T>>& distances)
         {
-            double dist = 0;
+            T dist = 0;
             const auto len = tour.size();
             
             for (int i = 0; i < len - 1; i++)

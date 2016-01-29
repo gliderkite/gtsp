@@ -25,7 +25,7 @@ namespace tsp
         double xDiff = p1.first - p2.first;
         double yDiff = p1.second - p2.second;
         
-        return sqrt(xDiff * xDiff + yDiff * yDiff);
+        return round(sqrt(xDiff * xDiff + yDiff * yDiff));
     }
     
     
@@ -88,7 +88,9 @@ namespace tsp
     }
     
     
-    void opt2(vector<size_t>& tour, const vector<vector<double>>& distances)
+    /* https://en.wikipedia.org/wiki/2-opt */
+    template<class T>
+    void opt2(vector<size_t>& tour, const vector<vector<T>>& distances)
     {
         // Get tour size
         const auto size = tour.size();
@@ -132,6 +134,89 @@ namespace tsp
         }
     }
     
+    
+    
+    bool opt2f(vector<size_t>& tour, const vector<vector<double>>& distances,
+               const vector<vector<size_t>>& nearest)
+    {
+        int radius;
+        bool improve_flag;
+        bool global_improve = false;
+        int improvement;
+        int index = -1;
+        int indexMaxImpr = -1;
+        int size = tour.size();
+        
+        vector<bool> usefull(size);
+        const auto neighbourSize = min(size, 60);
+        
+        for (int i = 0; i < size; i++)
+        {
+            if (usefull[tour[i]])
+                continue;
+            
+            improve_flag = false;
+            radius = (int) distances[tour[i]][tour[(i-1+size)%size]];
+            improvement = 0;
+            indexMaxImpr = -1;
+            
+            for (int j = 0; j < neighbourSize; j++)
+            {
+                index = -1;
+                
+                if (distances[tour[i]][nearest[tour[i]][j]] >= radius)
+                    break;
+                else
+                {
+                    for (int k = 0; k < size; k++)
+                    {
+                        if (nearest[tour[i]][j] == tour[k])
+                        {
+                            index = k;
+                            break;
+                        }
+                    }
+                    
+                    int prev_edges = (int) (distances[tour[i]][tour[(i-1+size)%size]] +
+                                                  distances[tour[index]][tour[(index-1+size)%size]]);
+                    
+                    int after_edges = (int) (distances[tour[(i-1+size)%size]][tour[(index-1+size)%size]] +
+                                                   distances[tour[i]][tour[index]]);
+                    
+                    if (after_edges < prev_edges && (prev_edges - after_edges) > improvement)
+                    {
+                        improvement = prev_edges-after_edges;
+                        indexMaxImpr = index;
+                        improve_flag = global_improve = true;
+                    }
+                }
+            }
+            
+            if (improve_flag)
+            {
+                if (i > indexMaxImpr)
+                {
+                    int temp = i;
+                    i = indexMaxImpr;
+                    indexMaxImpr = temp;
+                }
+                
+                for (int j = i; j < i + ((indexMaxImpr-i)/2); j++) 
+                {
+                    auto temp = tour[j];
+                    tour[j] = tour[indexMaxImpr + i - 1 - j];
+                    tour[indexMaxImpr + i - 1 - j] = temp;
+                }
+                
+                usefull[tour[i]] = false;
+                usefull[tour[indexMaxImpr]] = false;
+            }
+            else
+                usefull[tour[i]] = true;
+        }
+        
+        return global_improve;
+    }
     
     
    
