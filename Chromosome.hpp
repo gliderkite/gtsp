@@ -24,31 +24,40 @@ namespace tsp
         
         /* Constructs a new chromosome with a random tour. */
         template<class G>
-        explicit Chromosome(const vector<vector<T>>& distances, G& engine)
+        explicit Chromosome(const vector<vector<T>>& distances, G& engine,
+                            const vector<vector<unsigned>>& nearest)
         {
             const auto size = distances[0].size();
             tour.resize(size);
             
-            for (size_t i = 0; i < size; i++)
+            for (unsigned i = 0; i < size; i++)
                 tour[i] = i;
             
             shuffle(tour.begin(), tour.end(), engine);
-            opt2(distances);
+            opt2(distances, nearest);
         }
         
         /* Constructor. */
-        explicit Chromosome(const vector<size_t>& tour, const vector<vector<T>>& distances)
+        explicit Chromosome(const vector<unsigned>& tour,
+                            const vector<vector<T>>& distances,
+                            const vector<vector<unsigned>>& nearest)
         : tour(tour)
         {
-            opt2(distances);
+            opt2(distances, nearest);
+        }
+        
+        /* Constructor. */
+        explicit Chromosome(const vector<unsigned>& tour, T cost)
+        : tour(tour), cost(cost)
+        {
         }
         
         
-        void opt2(const vector<vector<T>>& distances)
+        void opt2(const vector<vector<T>>& distances,
+                  const vector<vector<unsigned>>& nearest)
         {
             // optimize the tour
-            tsp::opt2(tour, distances);
-            cost = TSP::cost(tour, distances);
+            cost = tsp::opt2(tour, distances);
         }
         
         bool operator<(const Chromosome& c) const
@@ -59,7 +68,7 @@ namespace tsp
         
     //private:
         
-        vector<size_t> tour;
+        vector<unsigned> tour;
         T cost;
     };
 }

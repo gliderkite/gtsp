@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <functional>
 #include <cmath>
+#include <cassert>
 using namespace std;
 using namespace chrono;
 
@@ -38,7 +39,6 @@ namespace tsp
         distances(TSP::distances<T>(coordinates)),
         minp(5),
         maxp(max_population()),
-        best_cost(numeric_limits<T>::max()),
         engine((unsigned)system_clock::now().time_since_epoch().count()),
         mprob(0.2),
         not_improving_gen(0),
@@ -47,11 +47,11 @@ namespace tsp
         {
             nearest.resize(psize);
             
-            for (size_t i = 0; i != psize; i++)
+            for (unsigned i = 0; i != psize; i++)
             {
                 nearest[i].resize(psize - 1);
                 
-                for (size_t j = 0, k = 0; j != psize; j++)
+                for (unsigned j = 0, k = 0; j != psize; j++)
                 {
                     if (i != j)
                         nearest[i][k++] = j;
@@ -65,25 +65,29 @@ namespace tsp
         }
         
         
+        /* Solves the TSP problem. */
         template<class S>
         Chromosome<T> solve(S& stopCriteria, double best_known = 0)
         {
-            init_population();
+            auto best = init_population();
+            auto n = 0;
             
             do
             {
-                if (best_cost <=  best_known)
+                if (best <=  best_known)
                     break;
                 
-                // FATHER AND MOTHER CAN BE THE SAME!!!
+                // select parents (could be the same)
                 const auto& father = parent();
                 const auto& mather = parent();
-                
                 mate(father, mather);
                 
-                update_population();
+                best = update_population(best);
+                n++;
             }
             while (!stopCriteria());
+            
+            cout << "Generations: " << n << endl;
             
             return population.front();
         }
@@ -91,14 +95,15 @@ namespace tsp
         
         
         
-    //private:
+    private:
         
         
-        
+        /* Implements the genetic crossover operator. */
         vector<Chromosome<T>> crossover(const Chromosome<T>& p1, const Chromosome<T>& p2)
         {
             // get the size of the tours
             const auto size = p1.tour.size();
+            assert(size == p2.tour.size());
             
             vector<Chromosome<T>> offspring(2, Chromosome<T>(size));
             auto& tour1 = offspring[0].tour;
@@ -162,17 +167,19 @@ namespace tsp
         }
         
         
-        void mutate(Chromosome<T>& chromosome)
+        /* Implements the genetic mutate operator. */
+        void mutate(Chromosome<T>& c)
         {
-            const auto len = (int)chromosome.tour.size() - 1;
+            const auto len = (int)c.tour.size() - 1;
             uniform_int_distribution<int> distribution(0, len);
             
             const auto pos1 = distribution(engine);
             const auto pos2 = distribution(engine);
-            swap(chromosome.tour[pos1], chromosome.tour[pos2]);
+            swap(c.tour[pos1], c.tour[pos2]);
         }
         
         
+        /* Implements the genetic invert operator. */
         void invert(Chromosome<T>& chromosome, bool invertGenes = false)
         {
             // get the size of the tours
@@ -194,35 +201,34 @@ namespace tsp
                 end++;
             
             // instantiate the new tour
-            auto newTour = chromosome.tour;
+            auto ntour = chromosome.tour;
             
             if (invertGenes == false)
             {
                 // Invert the string inside the cut
                 for (int i = start, j = end - 1; i < end; i++, j--)
-                    newTour[i] = chromosome.tour[j];
+                    ntour[i] = chromosome.tour[j];
             }
             else
             {
                 // reverses the two genes at the ends of the crossing section
-                short temp = chromosome.tour[start];
-                newTour[start] = chromosome.tour[end - 1];
-                newTour[end - 1] = temp;
+                swap(chromosome.tour[start], chromosome.tour[end - 1]);
                 
                 // Copy the others genes
                 for (int i = start + 1; i < end - 1; i++)
-                    newTour[i] = chromosome.tour[i];
+                    ntour[i] = chromosome.tour[i];
             }
             
             // Copy the genes after the cut
             for (int i = end; i < size; i++)
-                newTour[i] = chromosome.tour[i];
+                ntour[i] = chromosome.tour[i];
             
             // Store the new tour
-            chromosome.tour = newTour;
+            chromosome.tour = ntour;
         }
         
         
+        /* Mate parents. */
         void mate(const Chromosome<T>& p1, const Chromosome<T>& p2)
         {
             // Applies the order crossover operator to mate parents
@@ -236,7 +242,7 @@ namespace tsp
                     mutate(child);
                 
                 // optimize the tour
-                child.opt2(distances);
+                child.opt2(distances, nearest);
                 
                 const auto equal = [&child](const Chromosome<T>& c)
                     { return c.cost == child.cost; };
@@ -252,7 +258,7 @@ namespace tsp
                     invert(child);
                     
                     // optimize the tour
-                    child.opt2(distances);
+                    child.opt2(distances, nearest);
                     
                     // find if the populations contains the "same" tour already
                     it = find_if(begin(population), end(population), equal);
@@ -265,16 +271,13 @@ namespace tsp
         }
         
         
-        void update_population()
+        /* Kill the weakest. */
+        T update_population(T pbest)
         {
-            // previous best cost
-            const auto pbest = best_cost;
-            
+            // sort the population according to the fitness of its individials
             sort(population.begin(), population.end(), less<Chromosome<T>>());
-            best_cost = population.front().cost;
             
-            // Store the best tour
-            if (pbest > best_cost)
+            if (pbest > population.front().cost)
                 not_improving_gen = 0;
             else
             {
@@ -290,32 +293,34 @@ namespace tsp
                 }
             }
             
-            // Remove the weakest if any
+            // kill the weakest if any
             if (population.size() > maxp)
                 population.erase(begin(population) + maxp, end(population));
+            
+            return population.front().cost;
         }
         
         
-        
+        /* Mass extinction. */
         void extinction()
         {
             const auto size = population.size();
-            double totFitness = 0;
+            T tot_fit = 0;
             
-            //const auto nKill = int(size * massacre_percentage) + 1;
-            //int maxSurvivors = size - nKill;
+            const auto nKill = int(size * massacre_percentage) + 1;
+            const auto max_survivors = max(size - nKill, minp);
             
             // compute the total cost of all tours
             for (int i = 0; i < size; i++)
-                totFitness += population[i].cost;
+                tot_fit += population[i].cost;
             
-            vector<double> selprob(size);
+            vector<T> selprob(size);
             
             // compute the probability of being killed
             for (size_t i = 0; i < size; i++)
                 selprob[i] = population[i].cost;
             
-            uniform_int_distribution<int> distribution(0, (int)totFitness);
+            uniform_int_distribution<int> distribution(0, (int)tot_fit);
             int index = distribution(engine) + 1;
             int sum = 0, i;
             
@@ -327,34 +332,33 @@ namespace tsp
             for (int j = (int)population.size() - 1; j >= i && (int)population.size() > minp; j--)
                 population.erase(begin(population) + j);
             
-            // Kill individuals in excess
-            //while (population.size() > GAParameters.minPopulationSize && population.size() > maxSurvivors)
-                //population.remove(population.size() - 1);
+            // kill individuals in excess
+            if (population.size() > max_survivors)
+                population.erase(begin(population) + max_survivors, end(population));
         }
         
         
-        
+        /* Select an individual accorting to its fitness. */
         const Chromosome<T>& parent()
         {
-            const auto candidates_size = population.size() / minp + 2;
-            vector<double> selprob(candidates_size);
-            double totFitness = 0;
+            const int candidates_size = (int)population.size() / minp + 2;
+            vector<T> selprob(candidates_size);
+            T tot_fit = 0;
             
             // compute the total cost of all tours
-            for (size_t i = 0; i < candidates_size; i++)
-                totFitness += population[i].cost;
+            for (int i = 0; i < candidates_size; i++)
+                tot_fit += population[i].cost;
             
             // compute the probability of being selected
-            for (int i = 0, j = (int)candidates_size - 1; i < (int)candidates_size; i++, j--)
+            for (int i = 0, j = candidates_size - 1; i < candidates_size; i++, j--)
                 selprob[i] = population[j].cost;
             
-            uniform_int_distribution<int> distribution(0, totFitness + 1);
-            
+            uniform_int_distribution<int> distribution(0, tot_fit + 1);
             int index = distribution(engine) + 1;
-            int sum, i;
+            int sum = 0, i = 0;
             
             // select the parent
-            for (sum = 0, i = 0; sum < index && i < candidates_size; i++)
+            for (; sum < index && i < candidates_size; i++)
                 sum += selprob[i];
             
             return population[i - 1];
@@ -362,34 +366,51 @@ namespace tsp
         
         
         /* Initialize the population. */
-        void init_population()
+        T init_population()
         {
-            population.emplace_back(Chromosome<T>(nearest_neighbor(nearest), distances));
+            // init the population with the best/simplest heuristic function
+            population.emplace_back(nearest_neighbor(nearest), distances, nearest);
             
+            // add random tours to the population
             fill_population();
+            
+            return population.front().cost;
         }
         
         
+        /* Fill the population with random individials. */
         void fill_population()
         {
-            int max_attempts = int(population.size() * (maxp / minp + 1));
+            assert(maxp >= minp && minp > 0);
+            static const auto k = maxp / minp + 1;
+            auto max_attempts = int(population.size() * k);
+            population.reserve(max_attempts);
             
-            // Fills the population with random tours
-            while (max_attempts > 0 && population.size() < maxp)
+            assert(!distances.empty());
+            const auto size = distances.front().size();
+            vector<unsigned> tour(size);
+            
+            // init the tour
+            for (unsigned i = 0; i < size; i++)
+                tour[i] = i;
+            
+            // fills the population with random tours
+            while (max_attempts-- > 0 && population.size() < maxp)
             {
-                //Chromosome<> chromosome(distances, engine);
+                // randomize the tour
+                shuffle(tour.begin(), tour.end(), engine);
+                // optimize the tour
+                const auto cost = opt2(tour, distances);
                 
-                // Add the new chromosome if and only if it is not similar to the others
-                //if (population.contains(chromosome) == false)
-                    //population.add(chromosome);
+                const auto it = find_if(begin(population), end(population),
+                    [cost](const Chromosome<T>& c) { return cost == c.cost; });
                 
-                population.emplace_back(Chromosome<T>(distances, engine));
-                
-                max_attempts--;
+                // avoid similar individuals
+                if (it == end(population))
+                    population.emplace_back(tour, cost);
             }
             
             sort(population.begin(), population.end(), less<Chromosome<T>>());
-            best_cost = population.front().cost;
         }
         
         
@@ -419,10 +440,7 @@ namespace tsp
         const size_t maxp;
         
         // matrix of nearest nodes
-        vector<vector<size_t>> nearest;
-        
-        // best tour cost
-        T best_cost;
+        vector<vector<unsigned>> nearest;
         
         // population
         vector<Chromosome<T>> population;

@@ -2,16 +2,10 @@
 
 
 #include <iostream>
-#include <vector>
-#include <random>
 #include <stdexcept>
-#include <utility>
-#include <unordered_map>
 #include <string>
-#include <sstream>
-#include <fstream>
-#include <limits>
 #include <chrono>
+#include <iomanip>
 using namespace std;
 using namespace chrono;
 
@@ -29,10 +23,10 @@ static bool stop()
 
 
 int main(int argc, char* argv[])
-{
+{    
     if (argc < 3)
     {
-        cerr << "gtsp <filename> <timeout> [<best known>]" << endl;
+        cerr << "gtsp <filename> <timeout [s]> [<best known>]" << endl;
         return 1;
     }
     
@@ -46,10 +40,10 @@ int main(int argc, char* argv[])
         start = system_clock::now();
         const auto best = gtsp.solve(stop, best_known);
         
-        cout << "Best: " << best.cost;
+        cout << "Best: " << best.cost << setprecision(2);
         
         if (best_known < best.cost && best_known != 0)
-            cout << " " << (double)best_known / best.cost << "%";
+            cout << " " << (((double)best.cost - best_known) / best_known * 100) << "%";
         
         cout << endl;
         cout << "Elapsed: " << elapsed << " [s]" << endl << endl;
@@ -72,15 +66,4 @@ int main(int argc, char* argv[])
     
 	return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
 
