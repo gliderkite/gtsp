@@ -6,8 +6,6 @@
 #include "Heuristic.hpp"
 #include "TSP.hpp"
 
-#include <iostream>
-
 #include <vector>
 #include <utility>
 #include <chrono>
@@ -70,7 +68,7 @@ namespace tsp
         Chromosome<T> solve(S& stopCriteria, double best_known = 0)
         {
             auto best = init_population();
-            auto n = 0;
+            //auto n = 0;
             
             do
             {
@@ -83,11 +81,9 @@ namespace tsp
                 mate(father, mather);
                 
                 best = update_population(best);
-                n++;
+                //n++;
             }
             while (!stopCriteria());
-            
-            cout << "Generations: " << n << endl;
             
             return population.front();
         }

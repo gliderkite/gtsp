@@ -15,6 +15,7 @@ namespace tsp
     template<class T>
     struct Chromosome
     {
+        /* Constructor. */
         explicit Chromosome(size_t size)
         : cost(T())
         {
@@ -65,8 +66,6 @@ namespace tsp
             return (cost < c.cost);
         }
         
-        
-    //private:
         
         vector<unsigned> tour;
         T cost;
