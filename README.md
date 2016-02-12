@@ -25,3 +25,9 @@
 
 - **Killing rate**: 50%
 
+
+## How To
+
+**Compile**: `g++ -std=c++11 -Wall -O3 -DNDEBUG main.cpp -o gtsp`
+
+**Run**: `./gtsp <filename> <timeout [s]> [<best known>]`
