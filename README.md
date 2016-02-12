@@ -31,3 +31,18 @@
 **Compile**: `g++ -std=c++11 -Wall -O3 -DNDEBUG main.cpp -o gtsp`
 
 **Run**: `./gtsp <filename> <timeout [s]> [<best known>]`
+
+
+### Example
+
+**Input**: `./gtsp data/berlin52.tsp 5 7542`
+
+**Output**:
+
+```
+Best: 7542
+Elapsed: 0 [s]
+
+Best tour:
+{44, 31, 48, 0, 21, 30, 17, 2, 16, 20, 41, 6, 1, 29, 22, 19, 49, 28, 15, 45, 43, 33, 34, 35, 38, 39, 36, 37, 47, 23, 4, 14, 5, 3, 24, 11, 27, 26, 25, 46, 12, 13, 51, 10, 50, 32, 42, 9, 8, 7, 40, 18}
+```
